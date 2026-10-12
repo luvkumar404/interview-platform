@@ -1,0 +1,42 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Room {
+  id          String      @id @default(cuid())
+  code        String      @unique          // public room ID shared with candidate
+  hostToken   String                       // secret proving host identity
+  language    String      @default("javascript")
+  content     String      @default("")     // latest editor snapshot
+  status      RoomStatus  @default(ACTIVE)
+  createdAt   DateTime    @default(now())
+  expiresAt   DateTime
+  runs        Run[]
+}
+
+model Run {
+  id         String   @id @default(cuid())
+  roomId     String
+  room       Room     @relation(fields: [roomId], references: [id], onDelete: Cascade)
+  language   String
+  source     String
+  stdin      String?
+  stdout     String?
+  stderr     String?
+  exitCode   Int?
+  timeMs     Int?
+  createdAt  DateTime @default(now())
+}
+
+enum RoomStatus {
+  ACTIVE
+  ENDED
+}
