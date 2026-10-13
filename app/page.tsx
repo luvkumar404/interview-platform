@@ -38,6 +38,11 @@ export default function LandingPage() {
   } | null>(null);
   const [copiedLink, setCopiedLink] = React.useState(false);
   const [copiedCode, setCopiedCode] = React.useState(false);
+  const [currentYear, setCurrentYear] = React.useState<number>(2026);
+
+  React.useEffect(() => {
+    setCurrentYear(new Date().getFullYear());
+  }, []);
 
   // Handle Create Room
   const handleCreateRoom = async () => {
@@ -633,7 +638,7 @@ console.log("Result:", twoSum([2, 7, 11, 15], 9)); // [0, 1]`}
         <div className="container mx-auto max-w-6xl px-4 sm:px-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-muted-foreground">
           <div className="flex items-center gap-2">
             <Code2 className="size-4 text-indigo-400" />
-            <span>InterviewLab &copy; {new Date().getFullYear()}</span>
+            <span>InterviewLab &copy; {currentYear}</span>
             <span>&bull;</span>
             <span>Zero-login technical interview platform</span>
           </div>

@@ -41,8 +41,10 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+PRD.md
 
 # local data & ide folders
 .data/
 .claude/
 .windsurf/
+tsconfig.tsbuildinfo

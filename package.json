@@ -7,7 +7,8 @@
     "dev:next": "next dev",
     "build": "next build",
     "start": "tsx server.ts",
-    "lint": "eslint"
+    "lint": "eslint",
+    "postinstall": "prisma generate"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",
