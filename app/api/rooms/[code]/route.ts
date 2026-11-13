@@ -30,10 +30,10 @@ export async function GET(
       );
     }
 
-    // Check if host
+    // Shared links default to candidate, even when this browser owns the room.
     const cookieToken = req.cookies.get(`host_token_${code}`)?.value;
     const headerToken = req.headers.get("x-host-token");
-    const isHost = Boolean(
+    const isHost = req.nextUrl.searchParams.get("role") === "interviewer" && Boolean(
       (cookieToken && cookieToken === room.hostToken) ||
       (headerToken && headerToken === room.hostToken)
     );

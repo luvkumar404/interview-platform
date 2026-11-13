@@ -1,7 +1,7 @@
 import { createServer } from "node:http";
 import next from "next";
 import { Server as SocketIOServer } from "socket.io";
-import { initSocketServer } from "./lib/socket-server";
+
 
 const dev = process.env.NODE_ENV !== "production";
 const hostname = "localhost";
@@ -10,7 +10,7 @@ const port = parseInt(process.env.PORT || "3000", 10);
 const app = next({ dev, hostname, port });
 const handle = app.getRequestHandler();
 
-app.prepare().then(() => {
+app.prepare().then(async () => {
   const server = createServer(async (req, res) => {
     try {
       await handle(req, res);
@@ -29,6 +29,8 @@ app.prepare().then(() => {
     transports: ["websocket", "polling"],
   });
 
+  // Next has now loaded .env; initialize storage with the same configuration as API routes.
+  const { initSocketServer } = await import("./lib/socket-server");
   initSocketServer(io);
 
   server.listen(port, () => {
