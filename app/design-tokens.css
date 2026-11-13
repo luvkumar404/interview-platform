@@ -1,0 +1,7 @@
+:root {
+  --bg: #E8EDF1; --panel: #F6F8FA; --ink: #0E1A2B; --mute: #55657A; --line: #C9D3DD;
+  --blue: #2C4BFF; --live: #12A37A; --code: #0E1A2B; --code-text: #D7E1EE; --code-muted: #6F819A;
+  --keyword: #8FA5FF; --function: #6EE0BE; --number: #F2C97D; --code-line: #233349; --code-panel: #152236;
+  --on-blue: #fff; --demo-live: #3DD6A6;
+}
+.dark { --bg: #0A1220; --panel: #111C2E; --ink: #E6EDF6; --mute: #8FA0B6; --line: #233349; --blue: #7C92FF; --live: #3DD6A6; --code: #060C16; --on-blue: #0A1220; }

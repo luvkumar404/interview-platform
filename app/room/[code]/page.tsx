@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   AlertCircle,
   Clock,
@@ -28,8 +28,10 @@ type RoomPageState =
 
 function RoomPageContent({
   params,
+  role,
 }: {
   params: Promise<{ code: string }>;
+  role: "candidate" | "interviewer";
 }) {
   const router = useRouter();
   const resolvedParams = React.use(params);
@@ -55,15 +57,16 @@ function RoomPageContent({
       try {
         const storedHostToken =
           typeof window !== "undefined"
-            ? localStorage.getItem(`host_token_${code}`)
+            ? (() => { try { return localStorage.getItem(`host_token_${code}`); } catch { return null; } })()
             : null;
 
         const headers: Record<string, string> = {};
-        if (storedHostToken) {
+        if (role === "interviewer" && storedHostToken) {
           headers["x-host-token"] = storedHostToken;
         }
 
-        const res = await fetch(`/api/rooms/${code}`, {
+        const res = await fetch(`/api/rooms/${code}?role=${role}`, {
+          cache: "no-store",
           method: "GET",
           headers,
         });
@@ -110,7 +113,7 @@ function RoomPageContent({
     return () => {
       isCancelled = true;
     };
-  }, [code]);
+  }, [code, role]);
 
   // Handle entering room from Lobby
   const handleLobbyJoin = (settings: {
@@ -128,7 +131,7 @@ function RoomPageContent({
     return (
       <div className="h-screen w-screen flex flex-col items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-3">
-          <div className="size-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+          <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           <span className="font-mono text-xs text-muted-foreground">
             Connecting to room {code}...
           </span>
@@ -140,20 +143,20 @@ function RoomPageContent({
   if (state === "not_found") {
     return (
       <div className="h-screen w-screen flex items-center justify-center p-4 bg-background">
-        <div className="w-full max-w-md rounded-2xl border border-border/70 bg-card p-6 text-center shadow-xl">
+        <div className="w-full max-w-md rounded-2xl border border-border/70 bg-card p-6 text-center ">
           <div className="size-12 rounded-full bg-rose-500/10 text-rose-400 flex items-center justify-center mx-auto mb-4">
             <AlertCircle className="size-6" />
           </div>
-          <h2 className="text-xl font-bold mb-1.5">Room Not Found</h2>
+          <h2 className="text-xl font-bold mb-1.5">Room not found</h2>
           <p className="text-sm text-muted-foreground mb-6">
             Room <span className="font-mono font-semibold text-foreground">{code}</span> does not exist or may have expired.
           </p>
           <Button
             onClick={() => router.push("/")}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl gap-2"
+            className="w-full bg-primary  text-white rounded-xl gap-2"
           >
             <Home className="size-4" />
-            <span>Return to Home</span>
+            <span>Return home</span>
           </Button>
         </div>
       </div>
@@ -163,20 +166,20 @@ function RoomPageContent({
   if (state === "ended") {
     return (
       <div className="h-screen w-screen flex items-center justify-center p-4 bg-background">
-        <div className="w-full max-w-md rounded-2xl border border-border/70 bg-card p-6 text-center shadow-xl">
-          <div className="size-12 rounded-full bg-indigo-500/10 text-indigo-400 flex items-center justify-center mx-auto mb-4">
+        <div className="w-full max-w-md rounded-2xl border border-border/70 bg-card p-6 text-center ">
+          <div className="size-12 rounded-full bg-primary/10 text-primary flex items-center justify-center mx-auto mb-4">
             <Sparkles className="size-6" />
           </div>
-          <h2 className="text-xl font-bold mb-1.5">Interview Concluded</h2>
+          <h2 className="text-xl font-bold mb-1.5">Interview concluded</h2>
           <p className="text-sm text-muted-foreground mb-6">
             This interview session has been ended by the host. Thank you for your time!
           </p>
           <Button
             onClick={() => router.push("/")}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl gap-2"
+            className="w-full bg-primary  text-white rounded-xl gap-2"
           >
             <Home className="size-4" />
-            <span>Back to Home</span>
+            <span>Back to home</span>
           </Button>
         </div>
       </div>
@@ -186,20 +189,20 @@ function RoomPageContent({
   if (state === "expired") {
     return (
       <div className="h-screen w-screen flex items-center justify-center p-4 bg-background">
-        <div className="w-full max-w-md rounded-2xl border border-border/70 bg-card p-6 text-center shadow-xl">
+        <div className="w-full max-w-md rounded-2xl border border-border/70 bg-card p-6 text-center ">
           <div className="size-12 rounded-full bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto mb-4">
             <Clock className="size-6" />
           </div>
-          <h2 className="text-xl font-bold mb-1.5">Room Expired</h2>
+          <h2 className="text-xl font-bold mb-1.5">Room expired</h2>
           <p className="text-sm text-muted-foreground mb-6">
             This interview room exceeded its 24-hour lifetime and is no longer accessible.
           </p>
           <Button
             onClick={() => router.push("/")}
-            className="w-full bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl gap-2"
+            className="w-full bg-primary  text-white rounded-xl gap-2"
           >
             <Home className="size-4" />
-            <span>Create New Room</span>
+            <span>Create a new room</span>
           </Button>
         </div>
       </div>
@@ -239,7 +242,7 @@ function RoomPageSkeleton() {
   return (
     <div className="h-screen w-screen flex flex-col items-center justify-center bg-background">
       <div className="flex flex-col items-center gap-3">
-        <div className="size-8 animate-spin rounded-full border-2 border-indigo-500 border-t-transparent" />
+        <div className="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         <span className="font-mono text-xs text-muted-foreground">
           Connecting to room...
         </span>
@@ -253,7 +256,14 @@ export default function RoomPage(props: {
 }) {
   return (
     <React.Suspense fallback={<RoomPageSkeleton />}>
-      <RoomPageContent params={props.params} />
+      <RoomEntry params={props.params} />
     </React.Suspense>
   );
+}
+
+function RoomEntry({ params }: { params: Promise<{ code: string }> }) {
+  const searchParams = useSearchParams();
+  const role = searchParams.get("role") === "interviewer" ? "interviewer" : "candidate";
+  // Remount role-specific state when switching links within the same browser tab.
+  return <RoomPageContent key={role} params={params} role={role} />;
 }

@@ -1,7 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // Runtime room data and local browser profiles are not deployable source assets.
+  outputFileTracingExcludes: { "/*": ["./.data/**/*"] },
   experimental: {
     agentFeedback: true,
   },

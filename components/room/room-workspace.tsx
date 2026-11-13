@@ -1,6 +1,9 @@
 "use client";
 
 import * as React from "react";
+import { createPeerSession, type PeerSignal } from "@/lib/webrtc-session";
+import { roomInviteUrl } from "@/lib/room-links";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { io, Socket } from "socket.io-client";
 import {
@@ -93,7 +96,7 @@ export function RoomWorkspace({
   const [remoteStream, setRemoteStream] = React.useState<MediaStream | null>(null);
   const [audioEnabled, setAudioEnabled] = React.useState(initialAudioEnabled);
   const [videoEnabled, setVideoEnabled] = React.useState(initialVideoEnabled);
-  const peerConnectionRef = React.useRef<RTCPeerConnection | null>(null);
+  const [mediaState, setMediaState] = React.useState<RTCPeerConnectionState>("new");
 
   // In-room Chat state
   const [chatOpen, setChatOpen] = React.useState(false);
@@ -104,80 +107,41 @@ export function RoomWorkspace({
   const [endDialogOpen, setEndDialogOpen] = React.useState(false);
   const [copiedCode, setCopiedCode] = React.useState(false);
 
-  // WebRTC Ice configuration
-  const rtcConfig: RTCConfiguration = {
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:stun1.l.google.com:19302" },
-    ],
-  };
-
-  // Helper: create WebRTC Peer Connection
-  const getOrCreatePeerConnection = (activeSocket: Socket) => {
-    if (peerConnectionRef.current) {
-      return peerConnectionRef.current;
-    }
-
-    const pc = new RTCPeerConnection(rtcConfig);
-    peerConnectionRef.current = pc;
-
-    // Attach local stream tracks
-    if (localStream) {
-      localStream.getTracks().forEach((track) => {
-        pc.addTrack(track, localStream);
-      });
-    }
-
-    // Handle remote incoming tracks
-    pc.ontrack = (event) => {
-      if (event.streams && event.streams[0]) {
-        setRemoteStream(event.streams[0]);
-        setIsPeerConnected(true);
-      }
-    };
-
-    // Forward ICE candidates to peer via signaling server
-    pc.onicecandidate = (event) => {
-      if (event.candidate) {
-        activeSocket.emit("rtc:signal", {
-          roomId: roomCode,
-          data: { candidate: event.candidate },
-        });
-      }
-    };
-
-    pc.onconnectionstatechange = () => {
-      if (pc.connectionState === "disconnected" || pc.connectionState === "failed") {
-        setIsPeerConnected(false);
-      } else if (pc.connectionState === "connected") {
-        setIsPeerConnected(true);
-      }
-    };
-
-    return pc;
-  };
-
-  // Helper: Create and send WebRTC Offer
-  const initiateOffer = async (pc: RTCPeerConnection, activeSocket: Socket) => {
-    try {
-      const offer = await pc.createOffer();
-      await pc.setLocalDescription(offer);
-      activeSocket.emit("rtc:signal", {
-        roomId: roomCode,
-        data: { offer },
-      });
-    } catch (err) {
-      console.error("[WebRTC] Error creating offer:", err);
-    }
-  };
-
   // Initialize Socket.IO connection
   React.useEffect(() => {
     const newSocket = io(typeof window !== "undefined" ? window.location.origin : "", {
       transports: ["websocket", "polling"],
     });
 
+    let peer: ReturnType<typeof createPeerSession> | null = null;
+    function resetPeer() {
+      peer?.close();
+      peer = null;
+      setRemoteStream(null);
+      setMediaState("new");
+    }
+    function getPeer() {
+      if (!peer) peer = createPeerSession({
+        localStream,
+        send: (data) => newSocket.emit("rtc:signal", { roomId: roomCode, data }),
+        onStream: setRemoteStream,
+        onState: setMediaState,
+        onError: (error) => {
+          console.error("[WebRTC] Connection failed:", error);
+          setMediaState("failed");
+        },
+      });
+      return peer;
+    }
     setSocket(newSocket);
+    newSocket.on("disconnect", () => {
+      resetPeer();
+      setIsPeerConnected(false);
+      setParticipantCount(1);
+    });
+    newSocket.on("connect_error", () => toast.error("Cannot connect to the room server. Please reconnect."));
+    newSocket.on("room:full", () => toast.error("This room already has two people. Close another room tab and reconnect."));
+    newSocket.on("room:error", (data: { message: string }) => toast.error(data.message));
 
     newSocket.on("connect", () => {
       // Join Room
@@ -206,8 +170,8 @@ export function RoomWorkspace({
       toast.info(`${data.participantName || "Peer"} joined the interview!`);
 
       // If we are Host or first peer, create and send WebRTC offer
-      const pc = getOrCreatePeerConnection(newSocket);
-      await initiateOffer(pc, newSocket);
+      resetPeer();
+      await getPeer().offer();
     });
 
     // Peer already present in room
@@ -219,6 +183,8 @@ export function RoomWorkspace({
 
     // Peer left
     newSocket.on("room:peer-left", (data: any) => {
+      resetPeer();
+      setPeerName(null);
       setParticipantCount(1);
       setIsPeerConnected(false);
       toast.warning(`${data.participantName || "Peer"} left the interview`);
@@ -257,27 +223,9 @@ export function RoomWorkspace({
       }
     });
 
-    // WebRTC Signaling messages
-    newSocket.on("rtc:signal", async (signalData: any) => {
-      const pc = getOrCreatePeerConnection(newSocket);
-
-      try {
-        if (signalData.offer) {
-          await pc.setRemoteDescription(new RTCSessionDescription(signalData.offer));
-          const answer = await pc.createAnswer();
-          await pc.setLocalDescription(answer);
-          newSocket.emit("rtc:signal", {
-            roomId: roomCode,
-            data: { answer },
-          });
-        } else if (signalData.answer) {
-          await pc.setRemoteDescription(new RTCSessionDescription(signalData.answer));
-        } else if (signalData.candidate) {
-          await pc.addIceCandidate(new RTCIceCandidate(signalData.candidate));
-        }
-      } catch (err) {
-        console.error("[WebRTC] Signal handling error:", err);
-      }
+    // SDP and ICE are ordered inside the session, including early candidates.
+    newSocket.on("rtc:signal", (signal: PeerSignal) => {
+      void getPeer().receive(signal);
     });
 
     // Room Ended
@@ -287,11 +235,10 @@ export function RoomWorkspace({
 
     return () => {
       newSocket.disconnect();
-      if (peerConnectionRef.current) {
-        peerConnectionRef.current.close();
-      }
+      peer?.close();
+      peer = null;
     };
-  }, [roomCode, isHost, participantName]);
+  }, [roomCode, isHost, participantName, localStream]);
 
   // Code editor change handler
   const handleCodeChange = (newCode: string) => {
@@ -334,7 +281,7 @@ export function RoomWorkspace({
     }
   };
 
-  // Run Code execution
+  // Run code execution
   const handleRunCode = async () => {
     if (isRunning) return;
 
@@ -389,12 +336,12 @@ export function RoomWorkspace({
     }
   };
 
-  // End Interview handler (Host only)
+  // End interview handler (Host only)
   const handleEndInterview = async () => {
     try {
       const hostToken =
         typeof window !== "undefined"
-          ? localStorage.getItem(`host_token_${roomCode}`)
+          ? (() => { try { return localStorage.getItem(`host_token_${roomCode}`); } catch { return null; } })()
           : "";
 
       const res = await fetch(`/api/rooms/${roomCode}/end`, {
@@ -456,36 +403,28 @@ export function RoomWorkspace({
     router.push("/");
   };
 
-  const copyRoomCode = () => {
-    navigator.clipboard.writeText(roomCode);
+  const copyRoomCode = async () => {
+    try {
+    await navigator.clipboard.writeText(roomInviteUrl(roomCode, window.location.origin));
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
-    toast.success("Room ID copied to clipboard!");
+    toast.success("Room link copied");
+    } catch { toast.error("Copy the room link from your browser’s address bar."); }
   };
 
   return (
-    <div className="h-screen w-screen flex flex-col bg-background overflow-hidden selection:bg-indigo-500/20">
+    <div className="room-workspace">
       {/* Top Header Toolbar */}
-      <header className="h-13 shrink-0 border-b border-border/50 bg-background/90 backdrop-blur px-3 sm:px-4 flex items-center justify-between z-10">
+      <header className="room-toolbar">
         {/* Left: Brand & Room ID */}
         <div className="flex items-center gap-2.5 sm:gap-4">
-          <div
-            className="flex items-center gap-2 cursor-pointer"
-            onClick={() => router.push("/")}
-          >
-            <div className="size-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shadow-xs">
-              <Code2 className="size-4" />
-            </div>
-            <span className="font-bold text-sm tracking-tight hidden md:inline">
-              InterviewLab
-            </span>
-          </div>
+          <Link href="/" className="room-brand"><span />InterviewLab</Link>
 
           <div className="h-4 w-px bg-border/60" />
 
           {/* Room ID with quick copy */}
           <div className="flex items-center gap-1.5 bg-muted/50 rounded-lg px-2.5 py-1 border border-border/40">
-            <span className="text-[11px] text-muted-foreground uppercase font-semibold">
+            <span className="text-[11px] text-muted-foreground  font-semibold">
               Room
             </span>
             <span className="font-mono text-xs font-bold text-foreground">
@@ -493,11 +432,11 @@ export function RoomWorkspace({
             </span>
             <button
               onClick={copyRoomCode}
-              className="text-muted-foreground hover:text-foreground ml-1"
-              title="Copy Room ID"
+              className="text-muted-foreground  ml-1"
+              title="Copy room link" aria-label="Copy room link"
             >
               {copiedCode ? (
-                <Check className="size-3 text-emerald-400" />
+                <Check className="size-3 text-[var(--live)]" />
               ) : (
                 <Copy className="size-3" />
               )}
@@ -509,16 +448,16 @@ export function RoomWorkspace({
             variant="outline"
             className={`hidden sm:inline-flex text-[11px] gap-1.5 ${
               participantCount === 2
-                ? "border-emerald-500/30 text-emerald-400 bg-emerald-500/10"
+                ? "border-emerald-500/30 text-[var(--live)] bg-emerald-500/10"
                 : "border-amber-500/30 text-amber-400 bg-amber-500/10"
             }`}
           >
             <span
               className={`size-1.5 rounded-full ${
-                participantCount === 2 ? "bg-emerald-400" : "bg-amber-400 animate-pulse"
+                participantCount === 2 ? "bg-emerald-400" : "bg-amber-400 "
               }`}
             />
-            <span>{participantCount === 2 ? "2/2 Connected" : "Waiting for peer..."}</span>
+            <span>{participantCount === 2 ? "2 people connected" : "Waiting for peer..."}</span>
           </Badge>
 
           {/* Host indicator */}
@@ -549,12 +488,12 @@ export function RoomWorkspace({
             </SelectContent>
           </Select>
 
-          {/* Run Code Button */}
+          {/* Run code Button */}
           <Button
             size="sm"
             onClick={handleRunCode}
             disabled={isRunning}
-            className="h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-xs gap-1.5 shadow-sm shadow-emerald-600/20"
+            className="h-8 px-3 rounded-lg bg-primary  text-primary-foreground font-medium text-xs gap-1.5  "
           >
             {isRunning ? (
               <>
@@ -564,7 +503,7 @@ export function RoomWorkspace({
             ) : (
               <>
                 <Play className="size-3.5 fill-current" />
-                <span>Run Code</span>
+                <span>Run code</span>
                 <span className="text-[10px] opacity-70 hidden md:inline ml-0.5">
                   (Ctrl+Enter)
                 </span>
@@ -583,12 +522,12 @@ export function RoomWorkspace({
               setChatOpen(!chatOpen);
               setUnreadCount(0);
             }}
-            className="relative size-8 rounded-lg border border-border/40 hover:bg-muted"
-            title="Toggle Text Chat"
+            className="relative size-8 rounded-lg border border-border/40 "
+            title="Toggle chat" aria-label="Toggle chat"
           >
             <MessageSquare className="size-4" />
             {unreadCount > 0 && (
-              <span className="absolute -top-1 -right-1 size-4 rounded-full bg-indigo-600 text-white text-[9px] flex items-center justify-center font-bold">
+              <span className="absolute -top-1 -right-1 size-4 rounded-full bg-primary text-primary-foreground text-[9px] flex items-center justify-center font-bold">
                 {unreadCount}
               </span>
             )}
@@ -596,25 +535,26 @@ export function RoomWorkspace({
 
           <ThemeToggle />
 
-          {/* End Interview Button (Host Only) */}
+          {/* End interview Button (Host Only) */}
           {isHost && (
             <Button
               variant="destructive"
               size="sm"
               onClick={() => setEndDialogOpen(true)}
+              aria-label="End interview"
               className="h-8 px-2.5 text-xs rounded-lg gap-1.5"
             >
               <LogOut className="size-3.5" />
-              <span className="hidden sm:inline">End Interview</span>
+              <span className="hidden sm:inline">End interview</span>
             </Button>
           )}
         </div>
       </header>
 
       {/* Main Workspace Split Layout */}
-      <div className="flex-1 flex overflow-hidden">
+      <div className="room-workspace-body">
         {/* Left Side: Code Editor (Top) & Output Panel (Bottom) */}
-        <div className="flex-1 flex flex-col overflow-hidden min-w-0">
+        <div className="room-code-column">
           {/* Code Editor Container */}
           <div className="flex-1 min-h-[300px] overflow-hidden">
             <CodeEditor
@@ -646,7 +586,7 @@ export function RoomWorkspace({
         </div>
 
         {/* Right Side: Video Panel */}
-        <div className="w-72 lg:w-80 shrink-0 border-l border-border/50 hidden md:flex flex-col">
+        <div className="room-video-column">
           <VideoPanel
             roomCode={roomCode}
             localStream={localStream}
@@ -655,6 +595,7 @@ export function RoomWorkspace({
             remoteName={peerName}
             isHost={isHost}
             isPeerConnected={isPeerConnected}
+            mediaState={mediaState}
             audioEnabled={audioEnabled}
             videoEnabled={videoEnabled}
             onToggleAudio={handleToggleAudio}
@@ -673,11 +614,11 @@ export function RoomWorkspace({
         />
       </div>
 
-      {/* End Interview Confirmation Dialog */}
+      {/* End interview Confirmation Dialog */}
       <Dialog open={endDialogOpen} onOpenChange={setEndDialogOpen}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>End Interview Session?</DialogTitle>
+            <DialogTitle>End this interview?</DialogTitle>
             <DialogDescription>
               This will conclude the room and disconnect both participants. Saved
               snapshots and execution logs will be finalized.
@@ -688,7 +629,7 @@ export function RoomWorkspace({
               Cancel
             </Button>
             <Button variant="destructive" onClick={handleEndInterview}>
-              Yes, End Interview
+              End interview
             </Button>
           </DialogFooter>
         </DialogContent>

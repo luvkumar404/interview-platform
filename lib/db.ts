@@ -89,6 +89,7 @@ class LocalFallbackStore implements StorageAdapter {
   }
 
   async createRoom(code: string, hostToken: string, language: string, expiresAt: Date): Promise<Room> {
+    this.load();
     const room: Room = {
       id: "room_" + Math.random().toString(36).substring(2, 10),
       code,
@@ -105,12 +106,16 @@ class LocalFallbackStore implements StorageAdapter {
   }
 
   async getRoom(code: string): Promise<Room | null> {
+    // Next route bundles and the Socket.IO server have separate module instances.
+    this.load();
     const room = this.rooms.get(code);
     if (!room) return null;
     return room;
   }
 
   async endRoom(code: string): Promise<boolean> {
+    // Next route bundles and the Socket.IO server have separate module instances.
+    this.load();
     const room = this.rooms.get(code);
     if (!room) return false;
     room.status = "ENDED";
@@ -120,6 +125,8 @@ class LocalFallbackStore implements StorageAdapter {
   }
 
   async updateRoomContent(code: string, content: string): Promise<void> {
+    // Next route bundles and the Socket.IO server have separate module instances.
+    this.load();
     const room = this.rooms.get(code);
     if (room) {
       room.content = content;
@@ -129,6 +136,8 @@ class LocalFallbackStore implements StorageAdapter {
   }
 
   async updateRoomLanguage(code: string, language: string): Promise<void> {
+    // Next route bundles and the Socket.IO server have separate module instances.
+    this.load();
     const room = this.rooms.get(code);
     if (room) {
       room.language = language;
@@ -146,6 +155,7 @@ class LocalFallbackStore implements StorageAdapter {
     exitCode?: number;
     timeMs?: number;
   }): Promise<Run> {
+    this.load();
     const run: Run = {
       id: "run_" + Math.random().toString(36).substring(2, 10),
       roomId,
@@ -166,6 +176,7 @@ class LocalFallbackStore implements StorageAdapter {
   }
 
   async getRoomRuns(roomId: string): Promise<Run[]> {
+    this.load();
     return this.runs.get(roomId) || [];
   }
 }

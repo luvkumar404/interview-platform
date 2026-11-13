@@ -32,7 +32,7 @@ export function ChatDrawer({
 
   React.useEffect(() => {
     if (isOpen) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+      messagesEndRef.current?.scrollIntoView({ behavior: "instant" });
     }
   }, [messages, isOpen]);
 
@@ -47,18 +47,19 @@ export function ChatDrawer({
   };
 
   return (
-    <div className="w-80 h-full border-l border-border/50 bg-card flex flex-col shadow-xl z-20 transition-all">
+    <div className="room-chat w-80 h-full border-l border-border/50 bg-card flex flex-col  z-20 transition-all">
       {/* Chat Header */}
       <div className="flex h-12 items-center justify-between border-b border-border/40 px-3.5">
         <div className="flex items-center gap-2">
-          <MessageSquare className="size-4 text-indigo-400" />
-          <span className="font-semibold text-xs tracking-tight">Interview Chat</span>
+          <MessageSquare className="size-4 text-primary" />
+          <span className="font-semibold text-xs tracking-tight">Interview chat</span>
         </div>
         <Button
           variant="ghost"
           size="icon-xs"
           onClick={onClose}
-          className="text-muted-foreground hover:text-foreground"
+          aria-label="Close chat"
+          className="text-muted-foreground "
         >
           <X className="size-4" />
         </Button>
@@ -86,7 +87,7 @@ export function ChatDrawer({
                 <div
                   className={`rounded-xl px-3 py-2 max-w-[85%] break-words leading-relaxed ${
                     isMe
-                      ? "bg-indigo-600 text-white rounded-br-none"
+                      ? "bg-primary text-primary-foreground rounded-br-none"
                       : "bg-muted text-foreground rounded-bl-none border border-border/40"
                   }`}
                 >
@@ -104,14 +105,16 @@ export function ChatDrawer({
         <Input
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder="Type message..."
+          placeholder="Type a message…"
+          aria-label="Message"
           className="h-9 text-xs rounded-lg bg-background"
         />
         <Button
           type="submit"
+          aria-label="Send message"
           size="icon-sm"
           disabled={!input.trim()}
-          className="h-9 w-9 shrink-0 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg"
+          className="h-9 w-9 shrink-0 bg-primary  text-white rounded-lg"
         >
           <Send className="size-3.5" />
         </Button>

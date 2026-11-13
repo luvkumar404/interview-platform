@@ -1,0 +1,46 @@
+﻿.room-theme { font-size: 17px; line-height: 1.6; background: var(--bg); color: var(--ink); min-height: 100dvh; }
+.room-theme :is(h1,h2,h3) { font-weight: 800; letter-spacing: -.04em; }
+.room-theme button, .room-theme [data-slot="select-trigger"] { border-radius: 999px; font-weight: 600; transition: none; box-shadow: none; }
+.room-theme button:focus-visible, .room-theme input:focus-visible, .room-theme textarea:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
+.room-theme button { cursor: pointer; }
+.room-theme button:disabled { cursor: not-allowed; }
+.room-brand { display: inline-flex; align-items: center; gap: 10px; font-size: 20px; font-weight: 800; letter-spacing: -.04em; white-space: nowrap; text-decoration: none; }
+.room-brand > span { width: 10px; height: 10px; background: var(--live); border-radius: 50%; }
+.room-nav { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; padding: 28px 0; }
+.room-lobby { width: min(100%, 1168px); margin: auto; padding: env(safe-area-inset-top) max(24px, env(safe-area-inset-right)) max(40px, env(safe-area-inset-bottom)) max(24px, env(safe-area-inset-left)); display: grid; grid-template-columns: 1fr 1fr; gap: 50px; align-items: center; }
+.room-lobby-intro h1 { font-size: clamp(46px, 6vw, 80px); line-height: .98; margin: 24px 0; }
+.room-lobby-intro h1 span { color: var(--blue); }
+.room-lobby-card { background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 28px; }
+.room-lobby-card input { min-height: 48px; }
+.room-lobby-card button[type="submit"] { font-size: 15px; }
+.room-video-tile { background: var(--code); color: var(--code-text); border-color: var(--code-line); border-radius: 14px; min-height: 160px; }
+.room-video-tile .text-foreground { color: var(--code-text); }
+.room-video-tile .text-muted-foreground { color: var(--code-muted); }
+.room-video-tile button { background: var(--code-panel); color: var(--code-text); border-color: var(--code-line); }
+.room-avatar { width: 54px; height: 54px; border-radius: 50%; display: grid; place-items: center; background: var(--function); color: var(--code); font-size: 24px; font-weight: 600; }
+.room-workspace { height: 100dvh; display: flex; flex-direction: column; padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left); }
+.room-toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 24px; border-bottom: 1px solid var(--line); background: var(--bg); }
+.room-toolbar > div { flex-wrap: wrap; }
+.room-toolbar button { min-height: 36px; }
+.room-workspace-body { flex: 1; min-height: 0; display: flex; gap: 16px; padding: 20px 24px; position: relative; }
+.room-code-column { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; background: var(--code); }
+.room-video-column { width: 280px; flex-shrink: 0; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+.room-video-column > div { border: 0; background: var(--panel); }
+.room-chat { border: 1px solid var(--line); border-radius: 14px; flex-shrink: 0; }
+@media (max-width: 1050px) { .room-chat { position: absolute; right: 24px; top: 20px; bottom: 20px; height: auto; max-width: calc(100% - 48px); } }
+@media (max-width: 759px) {
+  .room-lobby { grid-template-columns: 1fr; gap: 24px; }
+  .room-nav { padding: 20px 0; }
+  .room-lobby-intro h1 { margin-bottom: 10px; }
+  .room-lobby-card { padding: 22px; }
+  .room-toolbar { padding: 14px 16px; }
+  .room-toolbar > div:first-child { width: 100%; }
+  .room-workspace { height: auto; min-height: 100dvh; }
+  .room-workspace-body { flex-direction: column; padding: 16px; }
+  .room-code-column { flex: none; min-height: 580px; }
+  .room-code-column > div:first-child { height: 360px; flex: none; }
+  .room-video-column { width: 100%; }
+  .room-video-column > div > div:first-child { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .room-video-tile { min-height: 190px; }
+  .room-chat { position: fixed; top: 140px; bottom: 16px; right: 16px; }
+}
