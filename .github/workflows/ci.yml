@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install dependencies
+        # The postinstall script generates the Prisma client.
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run WebRTC unit tests
+        run: npx tsx --test scripts/test-webrtc-session.ts
+
+      - name: Build
+        # DATABASE_URL is optional; the app supports local fallback storage.
+        run: npm run build
+
+      - name: Type check
+        # Build first so Next.js has generated its route types.
+        run: npx tsc --noEmit

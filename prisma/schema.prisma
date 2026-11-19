@@ -12,10 +12,10 @@ datasource db {
 
 model Room {
   id          String      @id @default(cuid())
-  code        String      @unique          // public room ID shared with candidate
-  hostToken   String                       // secret proving host identity
+  code        String      @unique          
+  hostToken   String                      
   language    String      @default("javascript")
-  content     String      @default("")     // latest editor snapshot
+  content     String      @default("")    
   status      RoomStatus  @default(ACTIVE)
   createdAt   DateTime    @default(now())
   expiresAt   DateTime
