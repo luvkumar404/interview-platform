@@ -9,17 +9,39 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NEXT_TELEMETRY_DISABLED: "1"
+
 jobs:
-  ci:
+  checks:
+    name: ${{ matrix.name }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: Lint
+            command: npm run lint
+          - name: Type check
+            command: npx --no-install next typegen && npx --no-install tsc --noEmit
+          - name: Unit tests
+            command: npx --no-install tsx --test scripts/test-webrtc-session.ts
+          - name: Build
+            command: npm run build
 
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
 
       - name: Set up Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
         with:
           node-version: "22"
           cache: npm
@@ -29,16 +51,6 @@ jobs:
         # The postinstall script generates the Prisma client.
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
-
-      - name: Run WebRTC unit tests
-        run: npx tsx --test scripts/test-webrtc-session.ts
-
-      - name: Build
+      - name: ${{ matrix.name }}
         # DATABASE_URL is optional; the app supports local fallback storage.
-        run: npm run build
-
-      - name: Type check
-        # Build first so Next.js has generated its route types.
-        run: npx tsc --noEmit
+        run: ${{ matrix.command }}
